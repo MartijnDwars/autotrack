@@ -1,0 +1,1 @@
+case class Car(brand: String, year: Int, mileage: Int, price: Int)
