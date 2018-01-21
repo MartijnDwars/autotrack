@@ -13,5 +13,5 @@ Driving 50,000 km in a BMW costs you 5495 euro more than driving 50,000 km in a 
 
 ## Future Work
 
-- We collected data for _all_ Fords and BMWs that were built in 2010 or later, but some models will loose value more quickly than others. Account for this in the analysis.
+- We analysed price as a function of mileage, but other factors (year, model) influence the depreciation as well.
 
