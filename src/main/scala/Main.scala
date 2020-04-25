@@ -7,18 +7,30 @@ import net.ruippeixotog.scalascraper.model.Element
 object Main extends LazyLogging {
   val brandMapping = Map(
     "BMW" -> "1a67a3d8-178b-43ee-9071-9ae7f19b316a",
-    "Ford" -> "44b04cbf-5eae-4538-b55a-b126f4b20318"
+    "Ford" -> "44b04cbf-5eae-4538-b55a-b126f4b20318",
+    "Peugeot" -> "1b83b9d6-c1c1-4ceb-ae38-d720f21ad741",
+    "Opel" -> "7ccf5430-eafb-4042-82c0-43ce39ba1b02",
+  )
+
+  val modelToBrandMapping = Map(
+    "Agila" -> "Opel",
+    "107" -> "Peugeot",
+  )
+
+  val modelMapping = Map(
+    "Agila" -> "e0f373aa-6be1-4154-aeac-5d754cc4d2a9",
+    "107" -> "ba9ddf1e-6973-40a2-ba0d-ddcc4e2ce024",
   )
 
   def main(args: Array[String]): Unit = {
     val configuration = Configuration(
       page = 1,
       pageSize = 100,
-      brands = List("Ford"),
-      minimumYear = 2010
+      brands = List("Peugeot"),
+      models = List("107")
     )
 
-    val cars = (61 to 83).flatMap(page => {
+    val cars = (1 to 1).flatMap(page => {
       logger.debug(s"Get page $page")
 
       getPage(configuration.copy(page = page))
@@ -31,6 +43,7 @@ object Main extends LazyLogging {
 
   def getPage(configuration: Configuration): List[Car] = {
     val url = getUrl(configuration)
+    println(url)
     val browser = JsoupBrowser()
     val catalog = browser.get(url)
     val articles = catalog >> elementList("article")
@@ -40,60 +53,38 @@ object Main extends LazyLogging {
   }
 
   def extractCar(article: Element): Car = {
-    val link = article >> element("a.searchresult__link") >> attr("href")
+    val link = article >> element("a.result-item__bottom-layer") >> attr("href")
 
-    val priceText = article >> element("span.searchresult__price") >> allText
-    val price = extractPrice(priceText)
+    val priceText = article >> element("data.result-item__price") >> attr("value")
+    val price = priceText.toInt
 
-    val summaryElements = article >> elementList("ul.searchresult__summary li")
-    val mileageText = summaryElements(0) >> text
-    val mileage = extractMileage(mileageText)
+    val yearText = article >> element("span[itemprop=productionDate]") >> text
+    val year = yearText.toInt
 
-    val yearText = summaryElements(1) >> text
-    val year = extractYear(yearText)
+    val mileageText = article >> element("meta[itemprop=mileageFromOdometer]") >> attr("content")
+    val mileage = mileageText.toInt
 
     Car(link, year, mileage, price)
-  }
-
-  def extractPrice(priceText: String): Int = {
-    if (priceText == "Prijs op aanvraag") {
-      -1
-    } else {
-      if (priceText.endsWith(" (Ex. BTW)")) {
-        priceText.substring(2, priceText.length-10).replace(".", "").toInt
-      } else {
-        priceText.substring(2).replace(".", "").toInt
-      }
-    }
-  }
-
-  def extractMileage(mileageText: String): Int = {
-    if (mileageText == "-") {
-      -1
-    } else {
-      mileageText.substring(0, mileageText.length - 3).replace(".", "").toInt
-    }
-  }
-
-  def extractYear(yearText: String): Int = {
-    yearText.toInt
   }
 
   def getUrl(configuration: Configuration): String = {
     val brandIds = configuration.brands.map(brandMapping.apply)
     val brands = brandIds.mkString(",")
 
-    s"https://www.autotrack.nl/tweedehands" +
-      s"?policy=accepted" +
-      s"&autosoorten=OCCASION" +
-      s"&sortering=" +
+    // TODO: Assumes one brand and one model
+    val modelIds = configuration.models.map(modelMapping.apply)
+    val models = s"${brandIds(0)}=${modelIds(0)}"
+
+    s"https://www.autotrack.nl/aanbod" +
+      s"?policy=accepted-20190101" +
       s"&paginagrootte=${configuration.pageSize}" +
       s"&postcode=" +
       s"&afstand=5" +
       s"&merkIds=" + brands +
+      s"&modelIds." + models +
       s"&minimumprijs=" +
-      s"&maximumprijs=" +
-      s"&minimumbouwjaar=${configuration.minimumYear}" +
+      s"&maximumprijs=99999" +
+      s"&minimumbouwjaar=" +
       s"&maximumbouwjaar=" +
       s"&minimumkilometerstand=" +
       s"&maximumkilometerstand=" +
@@ -105,5 +96,3 @@ object Main extends LazyLogging {
       s"&paginanummer=${configuration.page}"
   }
 }
-
-// Hypothesis: BMWs are more expensive to drive than Fords. Specifically, BMWs loose more value per time/distance than Fords.
